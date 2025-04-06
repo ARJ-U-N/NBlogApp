@@ -16,25 +16,59 @@ Mongoose.connect("mongodb+srv://a1r2j3u4n5:a1r2j3u4n5@cluster0.ck7ta.mongodb.net
 
 
 //create a post
-app.post("/create",async(req,res)=>{
+app.post("/create", async (req, res) => {
 
-    let input=req.body
+    let input = req.body
 
-    let token= req.headers.token
-    Jwt.verify(token,"BlogApp",async(error,decoded)=>{
+    let token = req.headers.token
+    Jwt.verify(token, "BlogApp", async (error, decoded) => {
         if (decoded && decoded.email) {
 
 
-            let result=new postModel(input)
+            let result = new postModel(input)
             await result.save()
-            res.json({"status":"Success "})
+            res.json({ "status": "Success " })
 
         } else {
 
-            res.json({"status":"invalid Authentication"})
-            
+            res.json({ "status": "invalid Authentication" })
+
         }
     })
+
+
+})
+
+// view all
+app.post("/viewall", (req, res) => {
+
+    let token = req.headers.token
+    Jwt.verify(token, "BlogApp", (error, decoded) => {
+        if (decoded && decoded.email) {
+
+            postModel.find(
+
+            ).then(
+                (items) => {
+                    res.json(items)
+                }
+            ).catch(
+                (error)=>{
+                    res.json({"status":"error"})
+
+                }
+            )
+
+
+        } else {
+
+
+
+            res.json({ "status": "invalid Authentication" })
+
+        }
+    })
+
 
 
 })
@@ -59,14 +93,14 @@ app.post("/signIn", async (req, res) => {
         (items) => {
             if (items.length > 0) {
 
-                const passwordValidator = Bcrypt.compareSync(req.body.password,items[0].password)
+                const passwordValidator = Bcrypt.compareSync(req.body.password, items[0].password)
                 if (passwordValidator) {
-                    Jwt.sign({email:req.body.email},"BlogApp",{expiresIn:"1d"},
-                        (error,token)=>{
+                    Jwt.sign({ email: req.body.email }, "BlogApp", { expiresIn: "1d" },
+                        (error, token) => {
                             if (error) {
-                                res.json({"status":"error","errorMessage":error})
+                                res.json({ "status": "error", "errorMessage": error })
                             } else {
-                                res.json({"status":"success","token":token,"userId":items[0]._id})
+                                res.json({ "status": "success", "token": token, "userId": items[0]._id })
 
                             }
                         })
