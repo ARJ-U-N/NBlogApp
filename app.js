@@ -39,46 +39,156 @@ app.post("/create", async (req, res) => {
 
 })
 
-// view all
-app.post("/viewall", (req, res) => {
+// View all posts
+// View all posts
+app.get("/viewall", (req, res) => {
+    let token = req.headers.token;
+    Jwt.verify(token, "BlogApp", (error, decoded) => {
+      if (decoded && decoded.email) {
+        let sortOption = {};
+        const filter = req.query.filter || "Top";
+        if (filter === "Top") {
+          sortOption = { likes: -1 };
+        } else if (filter === "Popular") {
+          sortOption = { likes: -1 };
+        } else if (filter === "Trending") {
+          sortOption = { postedDate: -1 };
+        } else if (filter === "Editor Choice") {
+          sortOption = { postedDate: 1 };
+        }
+        postModel
+          .find()
+          .populate("userId", "name")
+          .sort(sortOption)
+          .then((items) => {
+            res.json(items);
+          })
+          .catch((error) => {
+            res.status(500).json({ status: "error", message: error.message });
+          });
+      } else {
+        res.status(401).json({ status: "invalid Authentication" });
+      }
+    });
+  });
 
-    let token = req.headers.token
+// View my posts
+app.get("/viewmypost", (req, res) => {
+    let token = req.headers.token;
     Jwt.verify(token, "BlogApp", (error, decoded) => {
         if (decoded && decoded.email) {
-
-            postModel.find(
-
-            ).then(
-                (items) => {
-                    res.json(items)
-                }
-            ).catch(
-                (error)=>{
-                    res.json({"status":"error"})
-
-                }
-            )
-
-
+            userModel
+                .findOne({ email: decoded.email })
+                .then((user) => {
+                    if (!user) {
+                        return res.status(404).json({ status: "user not found" });
+                    }
+                    postModel
+                        .find({ userId: user._id })
+                        .populate("userId", "name") // Populate the author's name
+                        .then((items) => {
+                            res.json(items);
+                        })
+                        .catch((error) => {
+                            res.status(500).json({ status: "error", message: error.message });
+                        });
+                })
+                .catch((error) => {
+                    res.status(500).json({ status: "error", message: error.message });
+                });
         } else {
-
-
-
-            res.json({ "status": "invalid Authentication" })
-
+            res.status(401).json({ status: "invalid Authentication" });
         }
-    })
-
-
-
-})
-
+    });
+});
 
 
 
 
+// View a single post by ID
+app.get("/posts/:id", (req, res) => {
+    let token = req.headers.token;
+    Jwt.verify(token, "BlogApp", (error, decoded) => {
+        if (decoded && decoded.email) {
+            const userId = decoded.id; // Get the current user's ID from the token
+            
+            postModel
+                .findById(req.params.id)
+                .populate("userId", "name") // Populate the author's name
+                .then((post) => {
+                    if (!post) {
+                        return res.status(404).json({ status: "post not found" });
+                    }
+                    
+                    // Check if the current user has liked this post
+                    const hasLiked = post.likedBy.includes(userId);
+                    
+                    // Add hasLiked property to the response
+                    const postWithLikeStatus = {
+                        ...post.toObject(),
+                        hasLiked: hasLiked
+                    };
+                    
+                    res.json(postWithLikeStatus);
+                })
+                .catch((error) => {
+                    res.status(500).json({ status: "error", message: error.message });
+                });
+        } else {
+            res.status(401).json({ status: "invalid Authentication" });
+        }
+    });
+});
 
-
+// Like a post
+app.post("/posts/:id/like", (req, res) => {
+    let token = req.headers.token;
+    Jwt.verify(token, "BlogApp", (error, decoded) => {
+        if (decoded && decoded.email) {
+            const userId = decoded.id; // Get the current user's ID from the token
+            
+            postModel
+                .findById(req.params.id)
+                .then((post) => {
+                    if (!post) {
+                        return res.status(404).json({ status: "post not found" });
+                    }
+                    
+                    // Check if user has already liked this post
+                    if (post.likedBy.includes(userId)) {
+                        return res.status(400).json({ 
+                            status: "error", 
+                            message: "You have already liked this post",
+                            likes: post.likes,
+                            hasLiked: true
+                        });
+                    }
+                    
+                    // Add user to likedBy array and increment likes
+                    post.likedBy.push(userId);
+                    post.likes += 1;
+                    
+                    post
+                        .save()
+                        .then(() => {
+                            res.json({ 
+                                status: "success", 
+                                likes: post.likes,
+                                hasLiked: true
+                            });
+                        })
+                        .catch((error) => {
+                            res.status(500).json({ status: "error", message: error.message });
+                        });
+                })
+                .catch((error) => {
+                    res.status(500).json({ status: "error", message: error.message });
+                });
+        } else {
+            res.status(401).json({ status: "invalid Authentication" });
+        }
+    });
+});
 
 
 
@@ -172,3 +282,5 @@ app.post("/signup", async (req, res) => {
 app.listen(3030, () => {
     console.log("Server Started")
 })
+
+
